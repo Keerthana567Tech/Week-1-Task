@@ -1,19 +1,40 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { askAI } from "../api/aiApi";
+import ErrorMessage from "./ErrorMessage";
 
 function ChatUI() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return;
 
-    setMessages([
-      ...messages,
-      { type: "user", text: input },
-      { type: "ai", text: "AI response will appear here..." }
-    ]);
+    setError(null);
+    setLoading(true);
+
+    setMessages((prev) => [...prev, { type: "user", text: input }]);
     setInput("");
+
+    try {
+      const answer = await askAI(input);
+
+      if (!answer) {
+        throw new Error("NO_CONTEXT");
+      }
+
+      setMessages((prev) => [...prev, { type: "ai", text: answer }]);
+    } catch (err) {
+      setError(err.message);
+      setMessages((prev) => [
+        ...prev,
+        { type: "ai", text: "Unable to answer this question." }
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,13 +52,18 @@ function ChatUI() {
         ))}
       </div>
 
+      <ErrorMessage message={error} />
+
       <div className="chat-input">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask AI..."
+          disabled={loading}
         />
-        <button onClick={sendMessage}>Send</button>
+        <button onClick={sendMessage} disabled={loading}>
+          {loading ? "Thinking..." : "Send"}
+        </button>
       </div>
     </div>
   );
